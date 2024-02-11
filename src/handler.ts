@@ -3,19 +3,33 @@ import { Contact, ContactResponse } from "./models";
 import { Op } from "sequelize";
 
 export const handleContacts = async (req: Request, res: Response) => {
-    let contacts: Contact[] = await getContacts(req.body.email, req.body.phoneNumber)
-    let count = contacts.length;
-
-    let linkedId: number | undefined = NaN;
-    if ( count !== 0 ) {
-        if( contacts[0].linkPrecedence === 'primary' ) {
-            linkedId = contacts[0].id;
-        } else {
-            linkedId = contacts[0].linkedId;
-        }   
+    if ( req.body.email === null && req.body.phoneNumber === null ) {
+        res.sendStatus(422);
+        return
     }
 
-    let result: any = await insertNewContact(req.body.email, req.body.phoneNumber, linkedId)
+    let primaryId: number | undefined = await getPrimaryId(req.body.email, req.body.phoneNumber);
+    let contacts: Contact[] = [];
+
+    if ( primaryId ) {
+        let existingContacts = await getContacts(primaryId);
+        contacts.push(...existingContacts)
+    }
+
+    if ( req.body.email === null || req.body.phoneNumber === null ) {
+        if ( primaryId ) {
+            const response = getResponse(contacts);
+            res.json({
+                "contact": response
+            });
+            return
+        } else {
+            res.sendStatus(422);
+            return
+        }  
+    }
+
+    let result: any = await insertNewContact(req.body.email, req.body.phoneNumber, primaryId)
     if ( result instanceof Error ) {
         console.log(result)
     } else {
@@ -28,12 +42,33 @@ export const handleContacts = async (req: Request, res: Response) => {
     })
 }
 
-const getContacts = async ( email: string, phoneNumber: string ) => {
-    const rows = await Contact.findAll({
+const getPrimaryId = async ( email: string, phoneNumber: string ) => {
+    const contact = await Contact.findOne({
         where : {
             [Op.or] : [
                 { email: email },
                 { phoneNumber: phoneNumber },
+            ]
+        }
+    });
+
+    if ( contact ) {
+        if ( contact.linkPrecedence === 'primary' ) {
+            return contact.id;
+        } else {
+            return contact.linkedId;
+        }
+    } else {
+        return undefined;
+    }
+}
+
+const getContacts = async ( primaryId: number ) => {
+    const rows = await Contact.findAll({
+        where : {
+            [Op.or] : [
+                { id: primaryId },
+                { linkedId: primaryId },
             ]
         }
     });
@@ -46,7 +81,7 @@ const getContacts = async ( email: string, phoneNumber: string ) => {
     return contacts;
 }
 
-const insertNewContact = async ( email: string, phoneNumber: string, linkedId: number = NaN ) => {
+const insertNewContact = async ( email: string, phoneNumber: string, linkedId: number | undefined ) => {
     let precedence: string = 'primary';
     if ( linkedId ) {
         precedence = 'secondary';
