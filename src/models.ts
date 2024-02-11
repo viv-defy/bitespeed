@@ -24,7 +24,6 @@ Contact.init({
     email: DataTypes.STRING,
     linkedId: {
         type: DataTypes.STRING,
-        allowNull: false,
         field: 'linked_id',
     },
     linkPrecedence: {
@@ -60,6 +59,6 @@ Contact.init({
 export interface ContactResponse {
     primaryContatctId: number,
     emails: string[],
-    phoneNumbers: string,
+    phoneNumbers: string[],
     secondaryContactIds: number[]
 }
