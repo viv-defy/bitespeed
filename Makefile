@@ -5,3 +5,6 @@ build:
 
 run:
 	node dest/index.js
+
+clean:
+	rm database.sqlite
