@@ -8,8 +8,24 @@ export const handleContacts = async (req: Request, res: Response) => {
         return
     }
 
-    let primaryId: number | undefined = await getPrimaryId(req.body.email, req.body.phoneNumber);
+    let { primaryId, secondaryId } : { primaryId: number | null, secondaryId: number | null} = await getPrimaryIds(req.body.email, req.body.phoneNumber);
     let contacts: Contact[] = [];
+
+    if ( primaryId && secondaryId ) {
+        let id = await connectContacts( primaryId, secondaryId);
+        if ( !id ) {
+            res.sendStatus(500);
+            return
+        }
+        let updatedContacts = await getContacts( id );
+        contacts.push(...updatedContacts);
+        
+        const response = getResponse(contacts);
+        res.json({
+            "contact": response
+        })
+        return
+    }
 
     if ( primaryId ) {
         let existingContacts = await getContacts(primaryId);
@@ -42,25 +58,85 @@ export const handleContacts = async (req: Request, res: Response) => {
     })
 }
 
-const getPrimaryId = async ( email: string, phoneNumber: string ) => {
-    const contact = await Contact.findOne({
-        where : {
-            [Op.or] : [
-                { email: email },
-                { phoneNumber: phoneNumber },
-            ]
-        }
-    });
+const getPrimaryIds = async ( email: string, phoneNumber: string ) => {
 
-    if ( contact ) {
-        if ( contact.linkPrecedence === 'primary' ) {
-            return contact.id;
+    let id1: number | null = null;
+    let id2: number | null = null;
+    if ( email ) {
+        const contact1 = await Contact.findOne({
+            where : { email: email }
+        });
+        
+        id1 = getPrimaryIdFromContact( contact1 )
+    }
+
+    if ( phoneNumber ) {
+        const contact2 = await Contact.findOne({
+            where : { phoneNumber: phoneNumber }
+        });
+
+        if ( id1 ) { id2 = getPrimaryIdFromContact(contact2) }
+        else { id1 = getPrimaryIdFromContact(contact2) }
+    }
+    
+    if ( id1 && id2 ) {
+        if ( id1 === id2 ) {
+            return { primaryId: id1, secondaryId: null }
         } else {
-            return contact.linkedId;
+            return { primaryId: id1, secondaryId: id2 }
         }
     } else {
-        return undefined;
+        return { primaryId: id1, secondaryId: null };
+    }  
+}
+
+const getPrimaryIdFromContact = ( contact: Contact | null ) => {
+    if ( contact ) {
+        if ( contact.linkPrecedence === 'primary' ) { return contact.id }
+        else if( contact.linkedId ) { return contact.linkedId }
+        else { return null }
+    } else {
+        return null
     }
+}
+
+const connectContacts = async ( pid: number, sid: number ) => {
+    let contact1 = await Contact.findByPk( pid );
+    let contact2 = await Contact.findByPk( sid );
+
+    let primaryContact: Contact;
+    let secondaryContact: Contact;
+
+    if ( contact1 && contact2) {
+        if ( contact1.createdAt < contact2.createdAt ) {
+            primaryContact = contact1;
+            secondaryContact = contact2;
+        } else {
+            primaryContact = contact2;
+            secondaryContact = contact1;
+        }
+    } else {
+        const error = new Error("Error: unable to fetch primary contacts with primary keys " + pid + ", " + sid)
+        console.log(error);
+        return null;
+    }
+
+    await Contact.update(
+        {
+            linkedId: primaryContact.id,
+            linkPrecedence: 'secondary',
+        },
+        {
+            where: {
+                [Op.or] : [
+                    { linkedId: secondaryContact.id },
+                    { id: secondaryContact.id },
+                ]
+            }
+        }
+    );
+
+    return primaryContact.id;
 }
 
 const getContacts = async ( primaryId: number ) => {
@@ -81,7 +157,7 @@ const getContacts = async ( primaryId: number ) => {
     return contacts;
 }
 
-const insertNewContact = async ( email: string, phoneNumber: string, linkedId: number | undefined ) => {
+const insertNewContact = async ( email: string, phoneNumber: string, linkedId: number | null ) => {
     let precedence: string = 'primary';
     if ( linkedId ) {
         precedence = 'secondary';
