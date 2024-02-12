@@ -39,10 +39,7 @@ export const handleContacts = async (req: Request, res: Response) => {
                 "contact": response
             });
             return
-        } else {
-            res.sendStatus(422);
-            return
-        }  
+        }
     }
 
     let result: any = await insertNewContact(req.body.email, req.body.phoneNumber, primaryId)
