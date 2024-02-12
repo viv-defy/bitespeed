@@ -1,11 +1,8 @@
 build:
 	npm install
 	mkdir -p dest
-	npm install -g typescript
-	npm i --save-dev @types/express
-	tsc
-	npm install -g sequelize-cli
-	sequelize-cli db:migrate
+	npx tsc
+	npx sequelize-cli db:migrate
 
 run:
 	node dest/index.js
