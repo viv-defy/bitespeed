@@ -39,3 +39,5 @@ The user can make `POST` requests to the endpoint `/identify` running on PORT `3
 	"phoneNumber": "123456"
 }
 ```
+
+Note: An instance of this server is hosted on `https://bitespeed-s2pd.onrender.com`
