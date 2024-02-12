@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import { Logger } from './logger';
 import { handleContacts } from './handler';
 

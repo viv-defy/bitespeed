@@ -1,4 +1,4 @@
-import e, { Request, Response } from "express";
+import { Request, Response } from "express";
 import { Contact, ContactResponse } from "./models";
 import { Op } from "sequelize";
 
