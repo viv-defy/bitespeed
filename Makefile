@@ -2,6 +2,7 @@ build:
 	npm install
 	mkdir -p dest
 	npm install -g typescript
+	npm i --save-dev @types/express
 	tsc
 	npm install -g sequelize-cli
 	sequelize-cli db:migrate
